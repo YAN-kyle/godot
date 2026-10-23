@@ -108,6 +108,22 @@ const GodotDotnet = {
 		}
 		return 0;
 	},
+
+	// The .NET loader passes the browser's time zone to the runtime as the `TZ`
+	// environment variable, which `TimeZoneInfo.Local` reads. Godot sets it from
+	// this before initializing the runtime.
+	godot_js_dotnet_time_zone_get__deps: ['$GodotRuntime'],
+	godot_js_dotnet_time_zone_get__proxy: 'sync',
+	godot_js_dotnet_time_zone_get__sig: 'vii',
+	godot_js_dotnet_time_zone_get: function (p_ptr, p_ptr_max) {
+		let time_zone = '';
+		try {
+			time_zone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+		} catch (e) {
+			// Leave it empty, the runtime then falls back to UTC.
+		}
+		GodotRuntime.stringToHeap(time_zone, p_ptr, p_ptr_max);
+	},
 };
 
 mergeInto(LibraryManager.library, GodotDotnet);

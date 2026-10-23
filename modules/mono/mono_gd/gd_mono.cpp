@@ -104,6 +104,8 @@ extern "C" {
 // Defined in the Mono WASM runtime pack (src/driver.c). Since .NET 10 it also takes
 // the runtime properties (AppContext switches) to initialize the runtime with.
 void mono_wasm_load_runtime(int debug_level, int property_count, const char **property_keys, const char **property_values);
+// Defined in 'modules/mono/runtime/web/library_godot_dotnet.js'.
+void godot_js_dotnet_time_zone_get(char *p_ptr, int p_ptr_max);
 }
 #endif
 #endif // !TOOLS_ENABLED
@@ -639,6 +641,16 @@ MonoMethod *_initialize_method;
 
 godot_plugins_initialize_fn initialize_monovm_and_godot_plugins(bool &r_runtime_initialized) {
 	mono_install_assembly_preload_hook(&load_assembly_from_pck, nullptr);
+
+	// 'TimeZoneInfo.Local' reads the IANA time zone ID from 'TZ' and falls back to UTC
+	// without it. The .NET loader sets it from the browser, so do the same.
+	if (!OS::get_singleton()->has_environment("TZ")) {
+		char time_zone[128] = {};
+		godot_js_dotnet_time_zone_get(time_zone, sizeof(time_zone));
+		if (time_zone[0] != '\0') {
+			OS::get_singleton()->set_environment("TZ", String::utf8(time_zone));
+		}
+	}
 
 	// Same properties as the runtime pack's own 'initialize_runtime()' in driver.c.
 	const char *property_keys[] = { "APP_CONTEXT_BASE_DIRECTORY", "RUNTIME_IDENTIFIER" };
