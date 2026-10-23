@@ -79,14 +79,16 @@ def configure(env, env_mono):
         add_mono_library(env, "libmono-wasm-eh-wasm.a", mono_runtime_path)
         add_mono_library(env, "libmono-ee-interp.a", mono_runtime_path)
         add_mono_library(env, "libSystem.Native.a", mono_runtime_path)
-        add_mono_library(env, "libSystem.Globalization.Native.a", mono_runtime_path)
+        if env["dotnet_web_icu"]:
+            add_mono_library(env, "libSystem.Globalization.Native.a", mono_runtime_path)
         add_mono_library(env, "libSystem.IO.Compression.Native.a", mono_runtime_path)
         add_mono_library(env, "wasm-bundled-timezones.a", mono_runtime_path)
         add_mono_library(env, "libmono-wasm-simd.a", mono_runtime_path)
         add_mono_library(env, "libmono-icall-table.a", mono_runtime_path)
-        add_mono_library(env, "libicuuc.a", mono_runtime_path)
-        add_mono_library(env, "libicudata.a", mono_runtime_path)
-        add_mono_library(env, "libicui18n.a", mono_runtime_path)
+        if env["dotnet_web_icu"]:
+            add_mono_library(env, "libicuuc.a", mono_runtime_path)
+            add_mono_library(env, "libicudata.a", mono_runtime_path)
+            add_mono_library(env, "libicui18n.a", mono_runtime_path)
         add_mono_library(env, "libz.a", mono_runtime_path)
 
         # Mono components.
@@ -116,6 +118,23 @@ def configure(env, env_mono):
             get_runtime_pack_project_path, "obj", get_runtime_pack_obj_config, get_runtime_pack_tfm, rid, "wasm", "for-publish"
         )
         env_thirdparty.Prepend(CPPPATH=os.path.join(get_runtime_pack_project_includes))
+        if not env["dotnet_web_icu"]:
+            # Without ICU (about 1.3 MB of the wasm), only invariant globalization works.
+            # 'driver.c' then doesn't link ICU, and the P/Invoke table's
+            # 'libSystem.Globalization.Native' entries, which invariant mode doesn't call,
+            # point to stubs instead.
+            env_thirdparty.Append(CPPDEFINES=["INVARIANT_GLOBALIZATION"])
+            env_mono.Append(CPPDEFINES=["GD_MONO_WEB_NO_ICU"])
+            globalization_stubs_path = os.path.join(
+                env.Dir("#bin/obj").abspath,
+                "modules",
+                "mono",
+                "globalization_native_stubs." + get_runtime_pack_obj_config + ".gen.c",
+            )
+            write_globalization_native_stubs(
+                os.path.join(get_runtime_pack_project_includes, "pinvoke-table.h"), globalization_stubs_path
+            )
+            env_thirdparty.add_source_files(env.modules_sources, [globalization_stubs_path])
         env_thirdparty.add_source_files(
             env.modules_sources,
             [
@@ -136,6 +155,46 @@ def configure(env, env_mono):
                 os.path.join(module_dir, "runtime", "web", "library_godot_dotnet.js"),
             ]
         )
+
+
+"""
+Write stubs for the 'libSystem.Globalization.Native' functions in the generated P/Invoke table,
+for Web builds without ICU. With invariant globalization, the runtime never calls them. Otherwise,
+'GlobalizationNative_LoadICU' returning 0 makes the runtime fail with an error that asks for
+invariant globalization.
+"""
+def write_globalization_native_stubs(pinvoke_table_path: str, output_path: str):
+    import re
+
+    with open(pinvoke_table_path, encoding="utf-8") as f:
+        prototypes = sorted(set(re.findall(r"^(\w+) (GlobalizationNative_\w+) \(([^)]*)\);$", f.read(), re.MULTILINE)))
+    if not prototypes:
+        raise RuntimeError("No 'libSystem.Globalization.Native' functions found in '" + pinvoke_table_path + "'.")
+
+    lines = [
+        "/* THIS FILE IS GENERATED DO NOT EDIT */",
+        "/* Stubs for the P/Invoke table, for Web builds with 'dotnet_web_icu=no'. */",
+        "",
+        "#include <stdint.h>",
+        "",
+    ]
+    for return_type, name, params in prototypes:
+        param_types = [p.strip() for p in params.split(",") if p.strip()]
+        param_list = ", ".join(f"{t} p{i}" for i, t in enumerate(param_types)) or "void"
+        body = "" if return_type == "void" else " return 0; "
+        lines.append(f"{return_type} {name}({param_list}) {{{body}}}")
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    content = "\n".join(lines) + "\n"
+    # Don't rewrite an unchanged file, so SCons doesn't rebuild it.
+    try:
+        with open(output_path, encoding="utf-8") as f:
+            if f.read() == content:
+                return
+    except FileNotFoundError:
+        pass
+    with open(output_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(content)
 
 
 """

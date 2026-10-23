@@ -109,9 +109,11 @@ void mono_wasm_load_runtime(int debug_level, int property_count, const char **pr
 void mono_wasm_parse_runtime_options(int argc, char *argv[]);
 // Defined in 'modules/mono/runtime/web/library_godot_dotnet.js'.
 void godot_js_dotnet_time_zone_get(char *p_ptr, int p_ptr_max);
+#ifndef GD_MONO_WEB_NO_ICU
 // Defined in the Mono WASM runtime pack (libSystem.Globalization.Native.a). Passes the ICU data
 // to ICU ('udata_setCommonData'), which keeps using it. Returns non-zero on success.
 int32_t mono_wasm_load_icu_data(const void *p_data);
+#endif
 }
 #endif
 #endif // !TOOLS_ENABLED
@@ -663,6 +665,9 @@ void load_icu_data() {
 		return;
 	}
 
+#ifdef GD_MONO_WEB_NO_ICU
+	ERR_FAIL_MSG(".NET: This export template was built without ICU ('dotnet_web_icu=no'), so it only supports invariant globalization. Set 'InvariantGlobalization' to true in the C# project, or use a template built with ICU.");
+#else
 	Vector<uint8_t> data = FileAccess::get_file_as_bytes(path);
 	ERR_FAIL_COND_MSG(data.is_empty(), ".NET: Could not read ICU data in '" + path + "'.");
 
@@ -678,6 +683,7 @@ void load_icu_data() {
 	}
 
 	print_verbose(".NET: Loaded ICU data from '" + path + "'.");
+#endif // GD_MONO_WEB_NO_ICU
 }
 
 godot_plugins_initialize_fn initialize_monovm_and_godot_plugins(bool &r_runtime_initialized) {
