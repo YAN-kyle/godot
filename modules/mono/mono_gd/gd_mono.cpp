@@ -655,7 +655,11 @@ godot_plugins_initialize_fn initialize_monovm_and_godot_plugins(bool &r_runtime_
 	// Same properties as the runtime pack's own 'initialize_runtime()' in driver.c.
 	const char *property_keys[] = { "APP_CONTEXT_BASE_DIRECTORY", "RUNTIME_IDENTIFIER" };
 	const char *property_values[] = { "/", "browser-wasm" };
-	mono_wasm_load_runtime(1, std_size(property_keys), property_keys, property_values);
+	// A non-zero debug level enables debugging and turns off the interpreter's optimizations
+	// (see 'mono_wasm_load_runtime_common' in the runtime pack's runtime.c). Debugging can't
+	// work here, as the debugger component is linked as a stub (see 'mono_configure.py'), so
+	// use 0 for all templates, as the .NET SDK does for Release builds.
+	mono_wasm_load_runtime(0, std_size(property_keys), property_keys, property_values);
 
 	r_runtime_initialized = true;
 
