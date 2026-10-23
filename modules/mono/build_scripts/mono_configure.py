@@ -77,6 +77,9 @@ def configure(env, env_mono):
         add_mono_library(env, "libicudata.a", mono_runtime_path)
         add_mono_library(env, "libicui18n.a", mono_runtime_path)
         add_mono_library(env, "libz.a", mono_runtime_path)
+        # Since .NET 10, the diagnostics_tracing component calls into the browser profiler
+        # (mono_profiler_init_browser_eventpipe).
+        add_mono_library(env, "libmono-profiler-browser.a", mono_runtime_path)
 
         # Mono components.
         add_mono_component(env, "debugger", mono_runtime_path)
