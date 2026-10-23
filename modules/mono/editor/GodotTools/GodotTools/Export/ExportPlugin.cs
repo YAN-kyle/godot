@@ -224,6 +224,16 @@ namespace GodotTools.Export
                 publishConfig.Archs.Add("wasm32");
             }
 
+            var customProperties = new List<string>();
+
+            if (platform == OS.Platforms.Web)
+            {
+                // The assemblies must come from the runtime pack variant (single-threaded or
+                // multithreaded) that the export template's Mono runtime was built with.
+                bool threads = features.Contains("threads");
+                customProperties.Add($"WasmEnableThreads={(threads ? "true" : "false")}");
+            }
+
             var targets = new List<PublishConfig> { publishConfig };
 
             if (platform == OS.Platforms.iOS)
@@ -283,7 +293,7 @@ namespace GodotTools.Export
 
                     // Execute dotnet publish.
                     if (!BuildManager.PublishProjectBlocking(buildConfig, platform,
-                            runtimeIdentifier, publishOutputDir, includeDebugSymbols))
+                            runtimeIdentifier, publishOutputDir, includeDebugSymbols, customProperties))
                     {
                         throw new InvalidOperationException("Failed to build project. Check MSBuild panel for details.");
                     }

@@ -1,2 +1,12 @@
 <Project>
+  <!--
+    Keep the build files of single-threaded and multithreaded exports apart (the Godot export
+    passes WasmEnableThreads to match the preset's thread support). The runtime pack files are
+    older than the outputs of the previous build, so switching packs in the same directories
+    leaves stale trimmed assemblies from the other runtime pack behind.
+  -->
+  <PropertyGroup Condition=" '$(WasmEnableThreads)' == 'true' ">
+    <OutputPath>$(OutputPath)threads\</OutputPath>
+    <IntermediateOutputPath>$(IntermediateOutputPath)threads\</IntermediateOutputPath>
+  </PropertyGroup>
 </Project>
