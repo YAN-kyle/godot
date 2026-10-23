@@ -15,19 +15,6 @@
     <WasmEnableSIMD>true</WasmEnableSIMD>
   </PropertyGroup>
 
-  <!--
-    Invariant globalization by default, which avoids exporting ICU data. Projects can set
-    InvariantGlobalization to false for culture-sensitive behavior. The export then includes one ICU
-    data file that the runtime loads at startup: the full data (icudt.dat, 1.5 MB) by default, or the
-    one named by WasmIcuDataFileName (e.g. icudt_EFIGS.dat, 0.5 MB, only has data for the English,
-    French, Italian, German and Spanish cultures; other cultures silently fall back to the root locale).
-    Unlike the .NET loader, the export can't download a shard for the browser's locale on demand, so
-    it doesn't ship all the shards (2.6 MB).
-  -->
-  <PropertyGroup>
-    <InvariantGlobalization Condition=" '$(InvariantGlobalization)' == '' ">true</InvariantGlobalization>
-  </PropertyGroup>
-
   <!-- The runtime pack's ICU data files are always published. Only keep the one the game loads. -->
   <Target Name="_GodotSelectWebIcuData" AfterTargets="ComputeResolvedFilesToPublishList">
     <PropertyGroup>
