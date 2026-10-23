@@ -15,10 +15,32 @@
     <WasmEnableSIMD>true</WasmEnableSIMD>
   </PropertyGroup>
 
-  <!-- Godot doesn't load globalization data so we must enable invariant mode. -->
+  <!--
+    Invariant globalization by default, which avoids exporting ICU data. Projects can set
+    InvariantGlobalization to false for culture-sensitive behavior. The export then includes one ICU
+    data file that the runtime loads at startup: the full data (icudt.dat, 1.5 MB) by default, or the
+    one named by WasmIcuDataFileName (e.g. icudt_EFIGS.dat, 0.5 MB, only has data for the English,
+    French, Italian, German and Spanish cultures; other cultures silently fall back to the root locale).
+    Unlike the .NET loader, the export can't download a shard for the browser's locale on demand, so
+    it doesn't ship all the shards (2.6 MB).
+  -->
   <PropertyGroup>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <InvariantGlobalization Condition=" '$(InvariantGlobalization)' == '' ">true</InvariantGlobalization>
   </PropertyGroup>
+
+  <!-- The runtime pack's ICU data files are always published. Only keep the one the game loads. -->
+  <Target Name="_GodotSelectWebIcuData" AfterTargets="ComputeResolvedFilesToPublishList">
+    <PropertyGroup>
+      <_GodotWebIcuDataFileName>icudt</_GodotWebIcuDataFileName>
+      <_GodotWebIcuDataFileName Condition=" '$(WasmIcuDataFileName)' != '' ">$([System.IO.Path]::GetFileNameWithoutExtension('$(WasmIcuDataFileName)'))</_GodotWebIcuDataFileName>
+    </PropertyGroup>
+    <ItemGroup>
+      <_GodotWebIcuData Include="@(ResolvedFileToPublish)" Condition=" '%(Extension)' == '.dat' and $([System.String]::Copy('%(Filename)').StartsWith('icudt')) " />
+      <ResolvedFileToPublish Remove="@(_GodotWebIcuData)" />
+      <ResolvedFileToPublish Include="@(_GodotWebIcuData)" Condition=" '$(InvariantGlobalization)' != 'true' and '%(Filename)' == '$(_GodotWebIcuDataFileName)' " />
+    </ItemGroup>
+    <Error Condition=" '$(InvariantGlobalization)' != 'true' and '@(_GodotWebIcuData)' != '' and !@(ResolvedFileToPublish->AnyHaveMetadataValue('Filename', '$(_GodotWebIcuDataFileName)')) " Text="ICU data file '$(_GodotWebIcuDataFileName).dat' (WasmIcuDataFileName) isn't one of the runtime pack's: @(_GodotWebIcuData->'%(Filename)%(Extension)')." />
+  </Target>
 
   <ItemGroup>
     <TrimmerRootAssembly Include="GodotSharp" Condition="'$(EnableGodotDotNetPreview)' != 'true' and '$(DisableImplicitGodotSharpReferences)' != 'true'" />
