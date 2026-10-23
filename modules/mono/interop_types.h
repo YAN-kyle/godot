@@ -38,6 +38,13 @@ extern "C" {
 
 // This is taken from the old GDNative, which was removed.
 
+// The types that the C# side declares as a struct with a single pointer-sized (or 64-bit for RID)
+// field wrap a single scalar here too, instead of a byte array of the same size. Native ABIs treat
+// both the same, but the WebAssembly C ABI only passes and returns a struct directly when it wraps a
+// single scalar, and returns the byte array version through a hidden pointer instead. Mono passes
+// and returns such C# structs directly, so functions returning them by value (for example
+// 'godotsharp_variant_as_string') would trap with 'RuntimeError: function signature mismatch'.
+
 #define GODOT_VARIANT_SIZE (sizeof(real_t) * 4 + sizeof(int64_t))
 
 typedef struct {
@@ -59,13 +66,13 @@ typedef struct {
 #define GODOT_STRING_SIZE sizeof(void *)
 
 typedef struct {
-	uint8_t _dont_touch_that[GODOT_STRING_SIZE];
+	void *_dont_touch_that;
 } godot_string;
 
 #define GODOT_STRING_NAME_SIZE sizeof(void *)
 
 typedef struct {
-	uint8_t _dont_touch_that[GODOT_STRING_NAME_SIZE];
+	void *_dont_touch_that;
 } godot_string_name;
 
 #define GODOT_PACKED_ARRAY_SIZE (2 * sizeof(void *))
@@ -174,13 +181,13 @@ typedef struct {
 #define GODOT_NODE_PATH_SIZE sizeof(void *)
 
 typedef struct {
-	uint8_t _dont_touch_that[GODOT_NODE_PATH_SIZE];
+	void *_dont_touch_that;
 } godot_node_path;
 
 #define GODOT_RID_SIZE sizeof(uint64_t)
 
 typedef struct {
-	uint8_t _dont_touch_that[GODOT_RID_SIZE];
+	uint64_t _dont_touch_that;
 } godot_rid;
 
 // Alignment hardcoded in `core/variant/callable.h`.
