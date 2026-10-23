@@ -77,14 +77,19 @@ def configure(env, env_mono):
         add_mono_library(env, "libicudata.a", mono_runtime_path)
         add_mono_library(env, "libicui18n.a", mono_runtime_path)
         add_mono_library(env, "libz.a", mono_runtime_path)
-        # Since .NET 10, the diagnostics_tracing component calls into the browser profiler
-        # (mono_profiler_init_browser_eventpipe).
-        add_mono_library(env, "libmono-profiler-browser.a", mono_runtime_path)
 
         # Mono components.
-        add_mono_component(env, "debugger", mono_runtime_path)
-        add_mono_component(env, "diagnostics_tracing", mono_runtime_path)
-        add_mono_component(env, "hot_reload", mono_runtime_path)
+        # The debugger, diagnostics_tracing and hot_reload components are linked as stubs, which is
+        # also what the .NET SDK does for browser-wasm Release builds. The real components can't work
+        # with Godot's web loader: their transports (the debugger agent messages for the browser debug
+        # proxy, the diagnostic server's WebSocket, applying hot reload deltas) are implemented by the
+        # .NET JS runtime (`dotnet.runtime.js`), which Godot doesn't load, so the corresponding wasm
+        # imports are only inert stubs. This applies to debug templates as well.
+        # The full diagnostics_tracing component would also require `libmono-profiler-browser.a`.
+        add_mono_component(env, "debugger", mono_runtime_path, is_stub=True)
+        add_mono_component(env, "diagnostics_tracing", mono_runtime_path, is_stub=True)
+        add_mono_component(env, "hot_reload", mono_runtime_path, is_stub=True)
+        # Needed for runtime marshalling of P/Invokes and delegates with non-blittable signatures.
         add_mono_component(env, "marshal-ilgen", mono_runtime_path)
 
         # WASM additional sources.
