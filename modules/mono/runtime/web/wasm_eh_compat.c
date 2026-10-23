@@ -38,6 +38,13 @@
 // (now provided by libc++abi) and libunwind no longer defines the old name, so
 // the link fails with an undefined symbol.
 //
+// The rename is LLVM commit 1d4e04f7a7c2 ("[WebAssembly] Call EH personality
+// function instead of `Unwind_CallPersonality`", llvm/llvm-project#209282).
+// Emscripten applied its library side in commit d212b13bed0b
+// (emscripten-core/emscripten#27445), first released in Emscripten 6.0.6.
+// Older versions still define `_Unwind_CallPersonality` in libunwind and must
+// not get a second definition.
+//
 // Both functions take the thrown exception object, reset the landing pad
 // selector and run the personality routine's search phase, so forwarding is
 // enough. The landing pad context written by the old objects
@@ -46,7 +53,9 @@
 
 #include <emscripten/version.h>
 
-#if defined(__WASM_EXCEPTIONS__) && __EMSCRIPTEN_MAJOR__ >= 5
+#define GODOT_EMSCRIPTEN_VERSION (__EMSCRIPTEN_MAJOR__ * 10000 + __EMSCRIPTEN_MINOR__ * 100 + __EMSCRIPTEN_TINY__)
+
+#if defined(__WASM_EXCEPTIONS__) && GODOT_EMSCRIPTEN_VERSION >= 60006
 
 #include <unwind.h>
 
