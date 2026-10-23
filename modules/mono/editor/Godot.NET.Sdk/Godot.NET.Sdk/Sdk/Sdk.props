@@ -37,6 +37,21 @@
     <Error Text="Cannot build from path containing newlines, move your project or update dotnet to the latest version." Condition="$(GodotProjectDir.Contains('%0D'))" /> <!-- \r -->
   </Target>
 
+  <!--
+    Web: invariant globalization by default, which avoids exporting ICU data. Projects can set
+    InvariantGlobalization to false for culture-sensitive behavior. The export then includes one ICU
+    data file that the runtime loads at startup: the full data (icudt.dat, 1.5 MB) by default, or the
+    one named by WasmIcuDataFileName (e.g. icudt_EFIGS.dat, 0.5 MB, only has data for the English,
+    French, Italian, German and Spanish cultures; other cultures silently fall back to the root locale).
+    Unlike the .NET loader, the export can't download a shard for the browser's locale on demand, so
+    it doesn't ship all the shards (2.6 MB).
+    This must come before Microsoft.NET.Sdk's props: the WebAssembly workload's 'WasmFeatures.props',
+    imported from there, defaults InvariantGlobalization to false.
+  -->
+  <PropertyGroup Condition=" $(RuntimeIdentifier.StartsWith('browser')) ">
+    <InvariantGlobalization Condition=" '$(InvariantGlobalization)' == '' ">true</InvariantGlobalization>
+  </PropertyGroup>
+
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" Condition=" '$(GodotSdkImportsMicrosoftNetSdk)' == 'true' " />
 
   <PropertyGroup>
