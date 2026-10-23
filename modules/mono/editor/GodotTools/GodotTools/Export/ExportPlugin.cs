@@ -232,6 +232,18 @@ namespace GodotTools.Export
                 // multithreaded) that the export template's Mono runtime was built with.
                 bool threads = features.Contains("threads");
                 customProperties.Add($"WasmEnableThreads={(threads ? "true" : "false")}");
+
+                // The multithreaded Mono runtime starts several threads of its own (finalizer,
+                // thread pool workers, timers) on top of Godot's. When Emscripten's pthread pool is
+                // exhausted, a new thread can only start after the browser's main thread returns to
+                // its event loop; if the main thread waits for that thread instead, the page
+                // deadlocks (seen with the default pool size of 8).
+                const int MinEmscriptenPoolSize = 12;
+                if (threads && GetOption("threads/emscripten_pool_size").AsInt32() < MinEmscriptenPoolSize)
+                {
+                    throw new InvalidOperationException(
+                        $"C# projects exported for the web with thread support need 'threads/emscripten_pool_size' >= {MinEmscriptenPoolSize} in the export preset.");
+                }
             }
 
             var targets = new List<PublishConfig> { publishConfig };
