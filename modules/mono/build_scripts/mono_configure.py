@@ -37,6 +37,14 @@ def configure(env, env_mono):
             # It's fine if this directory doesn't exist.
             pass
 
+        # The publish compiles the runtime pack's native sources with the .NET SDK's own bundled
+        # Emscripten, which may be a different version than the one used to build Godot.
+        # Don't let the Emscripten config and cache selected for Godot's build leak into it,
+        # since the bundled emcc would try to use them instead of its own.
+        publish_env = os.environ.copy()
+        for var in ("EM_CONFIG", "EM_CACHE"):
+            publish_env.pop(var, None)
+
         import subprocess
         exit_code = subprocess.call(
             [
@@ -45,7 +53,8 @@ def configure(env, env_mono):
                 "-r", "browser-wasm",
                 "--self-contained",
                 "-c", "Release",
-            ]
+            ],
+            env=publish_env,
         )
         if exit_code != 0:
             raise RuntimeError("Couldn't retrieve Mono runtime pack for '" + rid + "'.")
