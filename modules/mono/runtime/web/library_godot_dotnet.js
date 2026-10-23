@@ -124,6 +124,27 @@ const GodotDotnet = {
 		}
 		GodotRuntime.stringToHeap(time_zone, p_ptr, p_ptr_max);
 	},
+
+	// The Mono log handler installed by `mono_wasm_load_runtime`. Runtime
+	// errors (e.g. failing to load an assembly, or the message before a fatal
+	// error aborts) would otherwise be lost.
+	mono_wasm_trace_logger__deps: ['$GodotRuntime'],
+	mono_wasm_trace_logger__sig: 'viiiii',
+	mono_wasm_trace_logger: function (p_domain, p_level, p_message, p_fatal, p_user_data) {
+		const message = `[MONO] ${p_message ? GodotRuntime.parseString(p_message) : '<no message>'}`;
+		const level = p_level ? GodotRuntime.parseString(p_level) : '';
+		if (p_fatal || level === 'critical' || level === 'error' || level === 'warning') {
+			GodotRuntime.error(message);
+		} else {
+			GodotRuntime.print(message);
+		}
+	},
+
+	// `Console.Clear()`.
+	mono_wasm_console_clear__sig: 'v',
+	mono_wasm_console_clear: function () {
+		console.clear(); // eslint-disable-line no-console
+	},
 };
 
 mergeInto(LibraryManager.library, GodotDotnet);
