@@ -227,6 +227,15 @@ def configure(env: "SConsEnvironment"):
     # Use POSIX-style paths, required with TempFileMunge.
     env["ARCOM_POSIX"] = env["ARCOM"].replace("$TARGET", "$TARGET.posix").replace("$SOURCES", "$SOURCES.posix")
     env["ARCOM"] = "${TEMPFILE('$ARCOM_POSIX','$ARCOMSTR')}"
+    # Same for linking: statically linking extra libraries (e.g. the Mono runtime with the
+    # `mono` module) can exceed cmd.exe's command line limit when building on Windows.
+    env["LINKCOM_POSIX"] = env["LINKCOM"].replace("$TARGET", "$TARGET.posix").replace("$SOURCES", "$SOURCES.posix")
+    env["LINKCOM"] = "${TEMPFILE('$LINKCOM_POSIX','$LINKCOMSTR')}"
+    # Emscripten parses response files with POSIX shell rules, so Windows path separators
+    # in flags (e.g. `--js-library C:\...`) would be eaten as escapes.
+    from SCons.Subst import quote_spaces
+
+    env["TEMPFILEARGESCFUNC"] = lambda arg: quote_spaces(arg.replace("\\", "/"))
 
     # All intermediate files are just object files.
     env["OBJPREFIX"] = ""
