@@ -2,6 +2,21 @@ def can_build(env, platform):
     return True
 
 
+def get_opts(platform):
+    from SCons.Variables import BoolVariable
+
+    if platform != "web":
+        return []
+
+    return [
+        BoolVariable(
+            "dotnet_web_icu",
+            "Link ICU into the .NET runtime, for exported projects that set InvariantGlobalization to false",
+            True,
+        ),
+    ]
+
+
 def configure(env):
     # Check if the platform has marked mono as supported.
     supported = env.get("supported", [])
