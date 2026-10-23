@@ -6,6 +6,13 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!--
+      Must be an executable: the WebAssembly SDK only treats non-library projects as
+      browser apps (IsBrowserWasmProject). Otherwise the native relink is skipped and
+      the sources in 'browser-wasm/wasm/for-publish' (pinvoke-table.h,
+      wasm_m2n_invoke.g.h, ...) that the Godot build compiles against are never generated.
+    -->
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <!-- This plus a non-empty $(RuntimeIdentifier) are enough to choose Mono. -->
