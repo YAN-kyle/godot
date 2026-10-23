@@ -109,7 +109,13 @@ def configure(env, env_mono):
         # Lets the prebuilt runtime's Wasm EH objects link with newer Emscripten versions.
         env_mono.add_source_files(env.modules_sources, [os.path.join(module_dir, "runtime", "web", "wasm_eh_compat.c")])
 
-        env.AddJSLibraries([os.path.join(mono_runtime_path, "src", "es6", "dotnet.es6.lib.js")])
+        # Must come after `dotnet.es6.lib.js`, as it overrides its `DOTNET.setup()` call.
+        env.AddJSLibraries(
+            [
+                os.path.join(mono_runtime_path, "src", "es6", "dotnet.es6.lib.js"),
+                os.path.join(module_dir, "runtime", "web", "library_godot_dotnet.js"),
+            ]
+        )
 
 
 """
