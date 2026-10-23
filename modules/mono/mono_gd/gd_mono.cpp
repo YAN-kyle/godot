@@ -109,6 +109,9 @@ void mono_wasm_load_runtime(int debug_level, int property_count, const char **pr
 void mono_wasm_parse_runtime_options(int argc, char *argv[]);
 // Defined in 'modules/mono/runtime/web/library_godot_dotnet.js'.
 void godot_js_dotnet_time_zone_get(char *p_ptr, int p_ptr_max);
+// Defined in the Mono WASM runtime pack (libSystem.Globalization.Native.a). Passes the ICU data
+// to ICU ('udata_setCommonData'), which keeps using it. Returns non-zero on success.
+int32_t mono_wasm_load_icu_data(const void *p_data);
 }
 #endif
 #endif // !TOOLS_ENABLED
@@ -642,6 +645,41 @@ godot_plugins_initialize_fn initialize_coreclr_and_godot_plugins(bool &r_runtime
 #ifdef WEB_ENABLED
 MonoMethod *_initialize_method;
 
+// Loads the ICU data file ('icudt*.dat') that the export includes when the project doesn't use
+// invariant globalization (see 'Browser.targets'). Without it, ICU (statically linked in the
+// template) has no data and culture-sensitive APIs fail. Must run before the runtime is initialized.
+void load_icu_data() {
+	const String dir = GodotSharpDirs::get_api_assemblies_dir();
+
+	String path;
+	for (const String &file : DirAccess::get_files_at(dir)) {
+		if (file.begins_with("icudt") && file.ends_with(".dat")) {
+			path = dir.path_join(file);
+			break;
+		}
+	}
+	if (path.is_empty()) {
+		// Invariant globalization, which doesn't use ICU.
+		return;
+	}
+
+	Vector<uint8_t> data = FileAccess::get_file_as_bytes(path);
+	ERR_FAIL_COND_MSG(data.is_empty(), ".NET: Could not read ICU data in '" + path + "'.");
+
+	// ICU keeps using the data for the lifetime of the runtime, so it's never freed. ICU
+	// requires it to be aligned to 16 bytes.
+	void *icu_data = nullptr;
+	ERR_FAIL_COND_MSG(posix_memalign(&icu_data, 16, data.size()) != 0, ".NET: Could not allocate memory for the ICU data.");
+	memcpy(icu_data, data.ptr(), data.size());
+
+	if (!mono_wasm_load_icu_data(icu_data)) {
+		free(icu_data);
+		ERR_FAIL_MSG(".NET: Failed to load ICU data from '" + path + "'.");
+	}
+
+	print_verbose(".NET: Loaded ICU data from '" + path + "'.");
+}
+
 godot_plugins_initialize_fn initialize_monovm_and_godot_plugins(bool &r_runtime_initialized) {
 	mono_install_assembly_preload_hook(&load_assembly_from_pck, nullptr);
 
@@ -654,6 +692,8 @@ godot_plugins_initialize_fn initialize_monovm_and_godot_plugins(bool &r_runtime_
 			OS::get_singleton()->set_environment("TZ", String::utf8(time_zone));
 		}
 	}
+
+	load_icu_data();
 
 	// Same properties as the runtime pack's own 'initialize_runtime()' in driver.c.
 	const char *property_keys[] = { "APP_CONTEXT_BASE_DIRECTORY", "RUNTIME_IDENTIFIER" };

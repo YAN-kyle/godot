@@ -203,13 +203,82 @@ const GodotDotnet = {
 	mono_wasm_release_cs_owned_object__sig: 'vi',
 	mono_wasm_release_cs_owned_object: function (p_js_handle) {},
 
-	// Only used when globalization isn't invariant, which needs ICU data that
-	// only the .NET loader can load. Return an error for managed code to throw.
-	mono_wasm_get_locale_info__deps: ['$GodotDotnetInterop', '$GodotRuntime'],
+	// Used by `CultureData` when globalization isn't invariant, for the display
+	// names of a locale's language and region (`CultureInfo.DisplayName`,
+	// `NativeName`, ...), which the .NET ICU data shards don't include. Follows
+	// `mono_wasm_get_locale_info` in the runtime's `globalization-locale.ts`:
+	// writes "<language>##<region>" as UTF-16 (without a terminator) and returns
+	// null, or returns an error message for managed code to throw.
+	mono_wasm_get_locale_info__deps: ['$GodotDotnetInterop', '$GodotRuntime', '$UTF16ToString'],
 	mono_wasm_get_locale_info__sig: 'iiiiiiii',
-	mono_wasm_get_locale_info: function (p_locale, p_locale_length, p_culture, p_culture_length, p_dst, p_dst_max_length, p_dst_length) {
-		GodotRuntime.setHeapValue(p_dst_length, -1, 'i32');
-		return GodotDotnetInterop.allocErrorString('Locale info requires the .NET JavaScript runtime, which Godot\'s .NET Web export doesn\'t load.');
+	mono_wasm_get_locale_info: function (p_culture, p_culture_length, p_locale, p_locale_length, p_dst, p_dst_max_length, p_dst_length) {
+		const normalize = function (p_name) {
+			if (!p_name) {
+				return undefined;
+			}
+			try {
+				let name = p_name.toLocaleLowerCase().replace('_', '-');
+				if (name.startsWith('zh-')) {
+					// Browsers don't know "zh-chs" and "zh-cht".
+					name = name.replace('-chs', '-Hans').replace('-cht', '-Hant');
+				}
+				const canonical = Intl.getCanonicalLocales(name);
+				return canonical.length > 0 ? canonical[0] : undefined;
+			} catch (e) {
+				return undefined;
+			}
+		};
+		const write = function (p_text) {
+			for (let i = 0; i < p_text.length; i++) {
+				GodotRuntime.setHeapValue(p_dst + i * 2, p_text.charCodeAt(i), 'i16');
+			}
+			GodotRuntime.setHeapValue(p_dst_length, p_text.length, 'i32');
+			return 0;
+		};
+		try {
+			const locale_original = UTF16ToString(p_locale, p_locale_length * 2);
+			const locale = normalize(locale_original);
+			if (!locale && locale_original) {
+				// Non-standard or malformed locale: forward it as is.
+				return write(locale_original);
+			}
+			const culture = normalize(UTF16ToString(p_culture, p_culture_length * 2));
+			if (!locale || !culture) {
+				throw new Error(`Locale or culture name is null or empty. localeName=${locale}, cultureName=${culture}`);
+			}
+			const parts = locale.split('-');
+			let language_name;
+			let region_name;
+			try {
+				const region = parts.length > 1 ? parts.pop() : undefined;
+				region_name = region ? new Intl.DisplayNames([culture], { type: 'region' }).of(region) : undefined;
+				language_name = new Intl.DisplayNames([culture], { type: 'language' }).of(parts.join('-'));
+			} catch (e) {
+				if (!(e instanceof RangeError)) {
+					throw e;
+				}
+				// "language-script" form, without a region.
+				try {
+					language_name = new Intl.DisplayNames([culture], { type: 'language' }).of(locale);
+				} catch (e2) {
+					if (e2 instanceof RangeError && locale_original) {
+						return write(locale_original);
+					}
+					throw e2;
+				}
+			}
+			const result = [language_name, region_name].join('##');
+			if (!result) {
+				throw new Error(`Locale info for locale=${locale} is null or empty.`);
+			}
+			if (result.length > p_dst_max_length) {
+				throw new Error(`Locale info for locale=${locale} exceeds length of ${p_dst_max_length}.`);
+			}
+			return write(result);
+		} catch (e) {
+			GodotRuntime.setHeapValue(p_dst_length, -1, 'i32');
+			return GodotDotnetInterop.allocErrorString(e.toString());
+		}
 	},
 };
 

@@ -382,11 +382,11 @@ namespace GodotTools.Export
                                 if (platform == OS.Platforms.Web && !IsWebRuntimeFile(path))
                                 {
                                     // The publish output for browser-wasm also contains the runtime pack's native
-                                    // archives, ICU data, wasm-props.json, *.deps.json, *.runtimeconfig.json, etc.
+                                    // archives, wasm-props.json, *.deps.json, *.runtimeconfig.json, etc.
                                     // These are only inputs for linking the web export template; the runtime is
                                     // already statically linked into it and is initialized from native code, so
-                                    // none of them are read at runtime. Only managed assemblies are loaded (by the
-                                    // assembly preload hook) so don't bloat the PCK with the rest.
+                                    // none of them are read at runtime. Only managed assemblies (loaded by the
+                                    // assembly preload hook) and ICU data are, so don't bloat the PCK with the rest.
                                     return;
                                 }
 
@@ -506,13 +506,17 @@ namespace GodotTools.Export
 
         /// <summary>
         /// Whether a file in the browser-wasm publish output is needed by the exported game at runtime.
-        /// The web runtime only loads managed assemblies (and their satellite assemblies) from the
-        /// published data directory, so keep those and their debug symbols.
+        /// The web runtime only loads managed assemblies (and their satellite assemblies) and ICU data
+        /// from the published data directory, so keep those and the assemblies' debug symbols.
         /// </summary>
         private static bool IsWebRuntimeFile(string path)
         {
             return path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ||
-                path.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase);
+                path.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase) ||
+                // ICU data, only published when the project doesn't use invariant globalization
+                // (see 'Browser.targets'). Loaded by the runtime at startup.
+                (Path.GetFileName(path).StartsWith("icudt", StringComparison.OrdinalIgnoreCase) &&
+                    path.EndsWith(".dat", StringComparison.OrdinalIgnoreCase));
         }
 
         private static void RecursePublishContents(string path, Func<string, bool> filterDir,
