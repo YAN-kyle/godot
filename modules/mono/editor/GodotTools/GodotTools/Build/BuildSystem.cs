@@ -192,6 +192,9 @@ namespace GodotTools.Build
             // Binary log
             AddBinaryLogArgument(buildInfo, arguments, editorSettings);
 
+            // Build servers
+            AddBuildServerArguments(arguments, isPublish: false);
+
             // Custom properties
             foreach (var customProperty in buildInfo.CustomProperties)
             {
@@ -248,6 +251,9 @@ namespace GodotTools.Build
             // Binary log
             AddBinaryLogArgument(buildInfo, arguments, editorSettings);
 
+            // Build servers
+            AddBuildServerArguments(arguments, isPublish: true);
+
             // Custom properties
             foreach (var customProperty in buildInfo.CustomProperties)
             {
@@ -298,6 +304,24 @@ namespace GodotTools.Build
 
             arguments.Add($"-bl:{Path.Combine(buildInfo.LogsDirPath, "msbuild.binlog")}");
             arguments.Add("-ds:False"); // Honestly never understood why -bl also switches -ds on.
+        }
+
+        private static void AddBuildServerArguments(Collection<string> arguments, bool isPublish)
+        {
+            // By default, `dotnet` leaves MSBuild worker nodes and the Roslyn compiler server
+            // (VBCSCompiler) running after the build, waiting to be reused (15 and 10 minutes idle).
+            // They are started as descendants of the editor, so whatever waits for the editor's
+            // process tree to finish waits for them too. Notably, on Windows the console wrapper
+            // (`godot.*.console.exe`) only returns once every process in its job object has exited,
+            // so a command line export appears to hang for about 10 minutes after it is done.
+            // Exports and headless runs (e.g. `--build-solutions`) are one-off builds that gain
+            // little from warm servers, so don't leave any behind for them. Interactive editor
+            // builds keep using them, since that makes rebuilds noticeably faster.
+            if (!isPublish && DisplayServer.GetName() != "headless")
+                return;
+
+            arguments.Add("-nodeReuse:false");
+            arguments.Add("-p:UseSharedCompilation=false");
         }
 
         private static void RemovePlatformVariable(StringDictionary environmentVariables)
