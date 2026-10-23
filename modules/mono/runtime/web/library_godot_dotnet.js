@@ -145,6 +145,72 @@ const GodotDotnet = {
 	mono_wasm_console_clear: function () {
 		console.clear(); // eslint-disable-line no-console
 	},
+
+	/*
+	 * JavaScript interop (`System.Runtime.InteropServices.JavaScript`) is
+	 * implemented by `dotnet.runtime.js`, so it isn't available here.
+	 */
+
+	$GodotDotnetInterop__deps: ['$stringToUTF16', 'malloc'],
+	$GodotDotnetInterop: {
+		NOT_SUPPORTED: 'JavaScript interop ([JSImport]/[JSExport], JSHost, JSObject) is not supported by Godot\'s .NET Web export. Use Godot\'s JavaScriptBridge instead.',
+
+		// Returns the message as a UTF-16 string allocated with `malloc`, the way
+		// the runtime returns error messages to managed code, which frees it.
+		allocErrorString: function (p_message) {
+			const size = (p_message.length + 1) * 2;
+			const ptr = _malloc(size);
+			stringToUTF16(p_message, ptr, size);
+			return ptr;
+		},
+	},
+
+	// Called first for every [JSImport] (including the runtime's own, used by
+	// `JSHost`). Returning a message makes managed code throw a `JSException`
+	// with it, so none of the other interop imports can be reached.
+	mono_wasm_bind_js_import_ST__deps: ['$GodotDotnetInterop'],
+	mono_wasm_bind_js_import_ST__sig: 'ii',
+	mono_wasm_bind_js_import_ST: function (p_signature) {
+		return GodotDotnetInterop.allocErrorString(GodotDotnetInterop.NOT_SUPPORTED);
+	},
+
+	mono_wasm_invoke_jsimport_ST__deps: ['$GodotDotnetInterop'],
+	mono_wasm_invoke_jsimport_ST__sig: 'vii',
+	mono_wasm_invoke_jsimport_ST: function (p_function_handle, p_args) {
+		throw new Error(GodotDotnetInterop.NOT_SUPPORTED);
+	},
+
+	mono_wasm_invoke_js_function__deps: ['$GodotDotnetInterop'],
+	mono_wasm_invoke_js_function__sig: 'vii',
+	mono_wasm_invoke_js_function: function (p_function_js_handle, p_args) {
+		throw new Error(GodotDotnetInterop.NOT_SUPPORTED);
+	},
+
+	mono_wasm_resolve_or_reject_promise__deps: ['$GodotDotnetInterop'],
+	mono_wasm_resolve_or_reject_promise__sig: 'vi',
+	mono_wasm_resolve_or_reject_promise: function (p_args) {
+		throw new Error(GodotDotnetInterop.NOT_SUPPORTED);
+	},
+
+	mono_wasm_cancel_promise__deps: ['$GodotDotnetInterop'],
+	mono_wasm_cancel_promise__sig: 'vi',
+	mono_wasm_cancel_promise: function (p_task_holder_gc_handle) {
+		throw new Error(GodotDotnetInterop.NOT_SUPPORTED);
+	},
+
+	// Called when a `JSObject` is disposed or finalized. None can exist without
+	// interop, and throwing from a finalizer would bring the runtime down.
+	mono_wasm_release_cs_owned_object__sig: 'vi',
+	mono_wasm_release_cs_owned_object: function (p_js_handle) {},
+
+	// Only used when globalization isn't invariant, which needs ICU data that
+	// only the .NET loader can load. Return an error for managed code to throw.
+	mono_wasm_get_locale_info__deps: ['$GodotDotnetInterop', '$GodotRuntime'],
+	mono_wasm_get_locale_info__sig: 'iiiiiiii',
+	mono_wasm_get_locale_info: function (p_locale, p_locale_length, p_culture, p_culture_length, p_dst, p_dst_max_length, p_dst_length) {
+		GodotRuntime.setHeapValue(p_dst_length, -1, 'i32');
+		return GodotDotnetInterop.allocErrorString('Locale info requires the .NET JavaScript runtime, which Godot\'s .NET Web export doesn\'t load.');
+	},
 };
 
 mergeInto(LibraryManager.library, GodotDotnet);
