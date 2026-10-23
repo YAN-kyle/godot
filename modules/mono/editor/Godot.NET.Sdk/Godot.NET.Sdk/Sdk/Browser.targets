@@ -41,4 +41,22 @@
     <TrimmerRootAssembly Include="Godot.Bindings" Condition="'$(EnableGodotDotNetPreview)' == 'true'" />
     <TrimmerRootAssembly Include="$(TargetName)" />
   </ItemGroup>
+
+  <!--
+    The trimmer only runs again when its input files change, not when its roots do (for example
+    when GodotTrimGodotSharp is toggled), which would export the previous trimmed assemblies.
+    Record the roots in a file that is only rewritten when they change, and make it an input.
+  -->
+  <Target Name="_GodotTrackTrimmerRoots" AfterTargets="PrepareForILLink">
+    <PropertyGroup>
+      <_GodotTrimmerRootsFile>$(IntermediateOutputPath)godot-trimmer-roots.txt</_GodotTrimmerRootsFile>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_GodotTrimmerRootsFile)" Lines="@(TrimmerRootAssembly)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <FileWrites Include="$(_GodotTrimmerRootsFile)" />
+    </ItemGroup>
+    <PropertyGroup>
+      <MSBuildAllProjects>$(MSBuildAllProjects);$(_GodotTrimmerRootsFile)</MSBuildAllProjects>
+    </PropertyGroup>
+  </Target>
 </Project>
