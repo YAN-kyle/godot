@@ -28,9 +28,20 @@
 
   <!-- Configuration for the Mono WASM runtime. Must match the features supported by the Godot build. -->
   <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
-    <WasmEnableThreads>false</WasmEnableThreads>
+    <!-- The Godot build passes WasmEnableThreads to match its `threads` option. -->
+    <WasmEnableThreads Condition="'$(WasmEnableThreads)' == ''">false</WasmEnableThreads>
     <WasmEnableExceptionHandling>true</WasmEnableExceptionHandling>
     <WasmEnableSIMD>true</WasmEnableSIMD>
+  </PropertyGroup>
+
+  <!--
+    Keep the intermediate files of the single-threaded and multithreaded runtime packs apart.
+    The pack files are older than the outputs of the previous publish, so switching packs in
+    the same directory leaves stale trimmed assemblies and generated sources behind.
+    The Godot build reads the generated sources from here (see 'mono_configure.py').
+  -->
+  <PropertyGroup Condition="'$(WasmEnableThreads)' == 'true'">
+    <IntermediateOutputPath>$(BaseIntermediateOutputPath)$(Configuration)-threads\</IntermediateOutputPath>
   </PropertyGroup>
 
   <!--

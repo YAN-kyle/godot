@@ -53,6 +53,8 @@ def configure(env, env_mono):
                 "-r", "browser-wasm",
                 "--self-contained",
                 "-c", "Release",
+                # Threaded builds need the multithreaded runtime pack.
+                "-p:WasmEnableThreads=" + ("true" if env["threads"] else "false"),
             ],
             env=publish_env,
         )
@@ -108,7 +110,11 @@ def configure(env, env_mono):
         if env["dlink_enabled"]:
             env_thirdparty.Append(CPPDEFINES=["WASM_SUPPORTS_DLOPEN"])
         env_thirdparty.Prepend(CPPPATH=os.path.join(mono_runtime_path, "include", "wasm"))
-        get_runtime_pack_project_includes = os.path.join(get_runtime_pack_project_path, "obj", "Release", get_runtime_pack_tfm, rid, "wasm", "for-publish")
+        # Must match the IntermediateOutputPath in GetRuntimePack.csproj.
+        get_runtime_pack_obj_config = "Release-threads" if env["threads"] else "Release"
+        get_runtime_pack_project_includes = os.path.join(
+            get_runtime_pack_project_path, "obj", get_runtime_pack_obj_config, get_runtime_pack_tfm, rid, "wasm", "for-publish"
+        )
         env_thirdparty.Prepend(CPPPATH=os.path.join(get_runtime_pack_project_includes))
         env_thirdparty.add_source_files(
             env.modules_sources,
