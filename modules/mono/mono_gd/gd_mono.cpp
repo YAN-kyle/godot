@@ -104,6 +104,9 @@ extern "C" {
 // Defined in the Mono WASM runtime pack (src/driver.c). Since .NET 10 it also takes
 // the runtime properties (AppContext switches) to initialize the runtime with.
 void mono_wasm_load_runtime(int debug_level, int property_count, const char **property_keys, const char **property_values);
+// Defined in the Mono WASM runtime pack (src/driver.c). Parses Mono runtime options
+// ('--option', '--no-option', '--option=value'); must be called before 'mono_wasm_load_runtime'.
+void mono_wasm_parse_runtime_options(int argc, char *argv[]);
 // Defined in 'modules/mono/runtime/web/library_godot_dotnet.js'.
 void godot_js_dotnet_time_zone_get(char *p_ptr, int p_ptr_max);
 }
@@ -655,6 +658,17 @@ godot_plugins_initialize_fn initialize_monovm_and_godot_plugins(bool &r_runtime_
 	// Same properties as the runtime pack's own 'initialize_runtime()' in driver.c.
 	const char *property_keys[] = { "APP_CONTEXT_BASE_DIRECTORY", "RUNTIME_IDENTIFIER" };
 	const char *property_values[] = { "/", "browser-wasm" };
+	// The jiterpreter (which compiles hot interpreter code to new wasm modules at runtime) is
+	// enabled by default in browser builds, but it's implemented in 'dotnet.runtime.js', which
+	// Godot doesn't load. Its wasm imports are only inert stubs (see 'library_godot_dotnet.js'),
+	// so the interpreter would keep preparing traces and entry points that never get compiled.
+	const char *runtime_options[] = {
+		"--no-jiterpreter-traces-enabled",
+		"--no-jiterpreter-interp-entry-enabled",
+		"--no-jiterpreter-jit-call-enabled",
+	};
+	mono_wasm_parse_runtime_options(std_size(runtime_options), const_cast<char **>(runtime_options));
+
 	// A non-zero debug level enables debugging and turns off the interpreter's optimizations
 	// (see 'mono_wasm_load_runtime_common' in the runtime pack's runtime.c). Debugging can't
 	// work here, as the debugger component is linked as a stub (see 'mono_configure.py'), so
