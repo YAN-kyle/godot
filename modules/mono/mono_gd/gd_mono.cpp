@@ -664,8 +664,11 @@ godot_plugins_initialize_fn initialize_monovm_and_godot_plugins(bool &r_runtime_
 	// so the interpreter would keep preparing traces and entry points that never get compiled.
 	const char *runtime_options[] = {
 		"--no-jiterpreter-traces-enabled",
+#ifndef THREADS_ENABLED
+		// Already off and read-only in the multithreaded runtime; setting them logs errors.
 		"--no-jiterpreter-interp-entry-enabled",
 		"--no-jiterpreter-jit-call-enabled",
+#endif
 	};
 	mono_wasm_parse_runtime_options(std_size(runtime_options), const_cast<char **>(runtime_options));
 
