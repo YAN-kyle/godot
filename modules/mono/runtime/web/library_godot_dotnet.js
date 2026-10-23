@@ -83,6 +83,31 @@ const GodotDotnet = {
 			_mono_background_exec();
 		}, 0);
 	},
+
+	// Source of `minipal_get_cryptographically_secure_random_bytes`, which backs
+	// `RandomNumberGenerator`, `Guid.NewGuid` and the runtime's hash seeds.
+	// Must return 0 only when the buffer was filled: the stub's return value
+	// coerces to 0, which made callers use the untouched (zeroed) buffer.
+	mono_wasm_browser_entropy__deps: ['$GodotRuntime'],
+	mono_wasm_browser_entropy__sig: 'iii',
+	mono_wasm_browser_entropy: function (p_buffer, p_length) {
+		if (!globalThis.crypto || !globalThis.crypto.getRandomValues) {
+			return -1;
+		}
+		const target = GodotRuntime.heapSub(HEAPU8, p_buffer, p_length);
+		// `getRandomValues` rejects views on a SharedArrayBuffer (threaded builds).
+		const needs_copy = typeof SharedArrayBuffer !== 'undefined' && target.buffer instanceof SharedArrayBuffer;
+		const buffer = needs_copy ? new Uint8Array(p_length) : target;
+		// `getRandomValues` fills at most 65536 bytes per call.
+		const max_batch = 65536;
+		for (let i = 0; i < p_length; i += max_batch) {
+			globalThis.crypto.getRandomValues(buffer.subarray(i, Math.min(p_length, i + max_batch)));
+		}
+		if (needs_copy) {
+			target.set(buffer);
+		}
+		return 0;
+	},
 };
 
 mergeInto(LibraryManager.library, GodotDotnet);
