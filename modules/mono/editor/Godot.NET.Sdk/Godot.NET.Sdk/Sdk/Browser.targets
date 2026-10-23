@@ -29,8 +29,15 @@
     <Error Condition=" '$(InvariantGlobalization)' != 'true' and '@(_GodotWebIcuData)' != '' and !@(ResolvedFileToPublish->AnyHaveMetadataValue('Filename', '$(_GodotWebIcuDataFileName)')) " Text="ICU data file '$(_GodotWebIcuDataFileName).dat' (WasmIcuDataFileName) isn't one of the runtime pack's: @(_GodotWebIcuData->'%(Filename)%(Extension)')." />
   </Target>
 
+  <!--
+    GodotSharp is kept whole by default, since it isn't annotated for trimming (it uses reflection
+    on script and Godot types). Projects can set GodotTrimGodotSharp to true to let the trimmer
+    remove its unused members instead, which makes the exported GodotSharp.dll about 55% smaller
+    (5.9 MB -> 2.7 MB). Test the exported game when doing so: code that reflects on Godot types
+    may fail at runtime.
+  -->
   <ItemGroup>
-    <TrimmerRootAssembly Include="GodotSharp" Condition="'$(EnableGodotDotNetPreview)' != 'true' and '$(DisableImplicitGodotSharpReferences)' != 'true'" />
+    <TrimmerRootAssembly Include="GodotSharp" Condition="'$(EnableGodotDotNetPreview)' != 'true' and '$(DisableImplicitGodotSharpReferences)' != 'true' and '$(GodotTrimGodotSharp)' != 'true'" />
     <TrimmerRootAssembly Include="Godot.Bindings" Condition="'$(EnableGodotDotNetPreview)' == 'true'" />
     <TrimmerRootAssembly Include="$(TargetName)" />
   </ItemGroup>
