@@ -3460,6 +3460,11 @@ Error BindingsGenerator::_generate_cs_native_calls(const InternalCall &p_icall, 
 	r_output << MEMBER_BEGIN "internal static unsafe " << (ret_void ? "void" : return_type->c_type_out) << " "
 			 << icall_method << "(" << c_func_sig.as_string() << ")\n" OPEN_BLOCK_L1;
 
+	// The method bind is null when this engine build does not register the
+	// method (see ClassDB_get_method_with_compatibility in GodotObject.base.cs).
+	r_output << INDENT2 "if (" CS_PARAM_METHODBIND " == IntPtr.Zero)\n"
+			 << INDENT3 "ExceptionUtils.ThrowMethodBindNotFound();\n";
+
 	if (!p_icall.is_static) {
 		r_output << INDENT2 "ExceptionUtils.ThrowIfNullPtr(" CS_PARAM_INSTANCE ");\n";
 	}

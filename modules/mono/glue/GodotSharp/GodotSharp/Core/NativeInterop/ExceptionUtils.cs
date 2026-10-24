@@ -268,5 +268,16 @@ namespace Godot.NativeInterop
                 throw new ArgumentNullException(paramName);
             }
         }
+
+        // Called by generated internal calls when the method bind is null, which
+        // means this engine build does not register the method. The generated
+        // code does the null check inline so the common path costs no call.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        internal static void ThrowMethodBindNotFound()
+        {
+            throw new GodotObject.NativeMethodBindNotFoundException(
+                "Unable to find the native method bind. The method is not available in this build of the engine; see the stack trace for the method.",
+                (string?)null);
+        }
     }
 }
