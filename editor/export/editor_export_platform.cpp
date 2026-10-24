@@ -1433,6 +1433,13 @@ Error EditorExportPlatform::export_project_files(const Ref<EditorExportPreset> &
 		return err;
 	}
 
+	// Export plugins cannot return an error; they report failures as error
+	// messages (the .NET plugin does this when the build fails or the solution
+	// is missing). Stop the export instead of writing a pack that lacks content.
+	if (get_worst_message_type() >= EXPORT_MESSAGE_ERROR) {
+		return FAILED;
+	}
+
 	HashMap<String, FileExportCache> export_cache;
 	String export_base_path = ProjectSettings::get_singleton()->get_project_data_path().path_join("exported/") + itos(custom_resources_hash);
 
@@ -1535,6 +1542,9 @@ Error EditorExportPlatform::export_project_files(const Ref<EditorExportPreset> &
 			if (!do_export) {
 				break;
 			}
+		}
+		if (get_worst_message_type() >= EXPORT_MESSAGE_ERROR) {
+			return FAILED; // An export plugin reported an error for this file, see above.
 		}
 		if (!do_export) {
 			continue;
