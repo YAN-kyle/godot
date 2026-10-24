@@ -307,12 +307,15 @@ namespace Godot
         {
             var typeSelf = (godot_string_name)type.NativeValue;
             var methodSelf = (godot_string_name)method.NativeValue;
-            IntPtr methodBind = NativeFuncs.godotsharp_method_bind_get_method_with_compatibility(typeSelf, methodSelf, hash);
 
-            if (methodBind == IntPtr.Zero)
-                throw new NativeMethodBindNotFoundException(type + "." + method);
-
-            return methodBind;
+            // This runs from the static constructor of the generated class, once
+            // per method. A method can be missing because the engine was built
+            // with a feature disabled (for example rendering_device=no on Web,
+            // or disable_3d). Do not throw here: that would make the whole class
+            // unusable (TypeInitializationException) for one missing method.
+            // The generated internal call throws NativeMethodBindNotFoundException
+            // if the missing method is actually called.
+            return NativeFuncs.godotsharp_method_bind_get_method_with_compatibility(typeSelf, methodSelf, hash);
         }
 
         internal static unsafe delegate* unmanaged<godot_bool, IntPtr> ClassDB_get_constructor(StringName type)
